@@ -6,7 +6,10 @@ services:
     environment:
       - NODE_ENV=production
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SUPABASE_ACCESS_TOKEN=${SUPABASE_ACCESS_TOKEN}
+      - DATABASE_URL=${DATABASE_URL}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     env_file:
       - .env
     restart: unless-stopped
