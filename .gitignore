@@ -1,1 +1,10 @@
 node_modules
+output.txt
+dist
+.mastra
+.env.development
+.env
+*.db
+*.db-*
+.netlify
+.vercel
