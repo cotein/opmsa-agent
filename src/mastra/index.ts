@@ -11,7 +11,7 @@ export const mastra = new Mastra({
   agents: { opmsaAgent },
   storage: new PostgresStore({
     id: "mastra-storage",
-    connectionString: process.env.SUPABASE_ACCESS_TOKEN as string,
+    connectionString: process.env.DATABASE_URL || process.env.SUPABASE_ACCESS_TOKEN as string,
   }),
   logger: new PinoLogger({
     name: 'Mastra',
