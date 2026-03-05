@@ -1,7 +1,7 @@
 ARG NODE_VERSION=24.0.0
 
 # --- Etapa 1: Build ---
-FROM node:${NODE_VERSION}-alpine as builder
+FROM node:${NODE_VERSION}-bookworm-slim as builder
 WORKDIR /app
 
 # Solo copiamos los archivos necesarios para instalar dependencias
@@ -18,7 +18,7 @@ COPY .env.example .env.example* ./
 RUN npm run build
 
 # --- Etapa 2: Runner ---
-FROM node:${NODE_VERSION}-alpine as runner
+FROM node:${NODE_VERSION}-bookworm-slim as runner
 WORKDIR /app
 
 ENV NODE_ENV=production
