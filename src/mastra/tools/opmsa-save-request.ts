@@ -25,13 +25,14 @@ export const opmsaSaveRequestTool = createTool({
     const client = await pool.connect();
     try {
       const res = await client.query(
-        `INSERT INTO demo_requests (full_name, dni, phone, specialty, reason, health_insurance, is_new_patient, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'RECIBIDO')
+        `INSERT INTO demo_requests (full_name, dni, phone, email, specialty, reason, health_insurance, is_new_patient, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'RECIBIDO')
          RETURNING id`,
         [
           data.nombre,
           data.dni,
           data.telefono,
+          data.email || null,
           data.especialidad,
           data.motivo,
           data.obraSocial,

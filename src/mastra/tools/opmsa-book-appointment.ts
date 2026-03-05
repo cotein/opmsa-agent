@@ -39,7 +39,7 @@ export const opmsaBookAppointmentTool = createTool({
           `INSERT INTO demo_pacientes (nombre_completo, telefono, email, obra_social)
            VALUES ($1, $2, $3, $4)
            RETURNING id`,
-          [pacienteNombre, pacienteTelefono, pacienteEmail || '', obraSocial || '']
+          [pacienteNombre, pacienteTelefono, pacienteEmail || null, obraSocial || null]
         );
         pacienteId = newPatient.rows[0].id;
       }
