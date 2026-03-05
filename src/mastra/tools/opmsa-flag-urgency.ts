@@ -10,7 +10,7 @@ const pool = new Pool({
 
 export const opmsaFlagUrgencyTool = createTool({
   id: 'opmsa-flag-urgency',
-  description: 'Marca una conversación como urgencia dental y guarda el contacto.',
+  description: 'Marca una conversación como urgencia dental y guarda el contacto en demo_requests.',
   inputSchema: z.object({
     phone: z.string().describe('Teléfono del paciente'),
     reason: z.string().describe('Motivo de la urgencia'),
@@ -19,8 +19,8 @@ export const opmsaFlagUrgencyTool = createTool({
     const client = await pool.connect();
     try {
       await client.query(
-        `INSERT INTO demo_pedidos (telefono, motivo, estado, especialidad, nombre, dni, obra_social, es_nuevo)
-         VALUES ($1, $2, 'urgencia', 'Urgencia', 'Paciente Urgencia', '0', 'N/A', false)`,
+        `INSERT INTO demo_requests (phone, reason, status, specialty, full_name, dni, health_insurance, is_new_patient)
+         VALUES ($1, $2, 'URGENCIA', 'Urgencia', 'Paciente Urgencia', '0', 'N/A', false)`,
         [phone, reason]
       );
       return { success: true, message: 'Urgencia marcada y guardada.' };

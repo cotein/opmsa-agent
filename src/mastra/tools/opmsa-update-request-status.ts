@@ -10,16 +10,16 @@ const pool = new Pool({
 
 export const opmsaUpdateRequestStatusTool = createTool({
   id: 'opmsa-update-request-status',
-  description: 'Actualiza el estado de una solicitud de turno (ej. a "agendado").',
+  description: 'Actualiza el estado de una solicitud de turno en demo_requests.',
   inputSchema: z.object({
-    requestId: z.number().describe('ID de la solicitud en demo_pedidos'),
-    nuevoEstado: z.string().describe('Nuevo estado (agendado, cancelado, etc.)'),
+    requestId: z.string().describe('ID de la solicitud (UUID)'),
+    nuevoEstado: z.enum(['RECIBIDO', 'PENDIENTE VALIDACION', 'TURNO CONFIRMADO', 'REPROGRAMADO', 'CANCELADO', 'SIN RESPUESTA', 'URGENCIA']).describe('Nuevo estado válido'),
   }),
   execute: async ({ requestId, nuevoEstado }) => {
     const client = await pool.connect();
     try {
       await client.query(
-        `UPDATE demo_pedidos SET estado = $1 WHERE id = $2`,
+        `UPDATE demo_requests SET status = $1 WHERE id = $2`,
         [nuevoEstado, requestId]
       );
       return { success: true, requestId, nuevoEstado, message: `Estado actualizado a ${nuevoEstado} con éxito.` };

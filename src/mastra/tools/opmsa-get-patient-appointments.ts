@@ -21,7 +21,8 @@ export const opmsaGetPatientAppointmentsTool = createTool({
         `SELECT a.id, a.fecha_hora, e.nombre as especialista, e.especialidad
          FROM demo_agenda a
          JOIN demo_especialistas e ON a.especialista_id = e.id
-         WHERE a.paciente_telefono = $1 AND a.fecha_hora >= NOW() AND a.estado = 'reservado'
+         JOIN demo_pacientes p ON a.paciente_id = p.id
+         WHERE p.telefono = $1 AND a.fecha_hora >= NOW() AND a.estado = 'reservado'
          ORDER BY a.fecha_hora ASC`,
         [phone]
       );

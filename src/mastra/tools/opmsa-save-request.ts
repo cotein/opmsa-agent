@@ -10,7 +10,7 @@ const pool = new Pool({
 
 export const opmsaSaveRequestTool = createTool({
   id: 'opmsa-save-request',
-  description: 'Guarda una solicitud de turno completa en la tabla de leads/pedidos.',
+  description: 'Guarda una solicitud de turno completa en la tabla de leads/pedidos (demo_requests).',
   inputSchema: z.object({
     nombre: z.string(),
     dni: z.string(),
@@ -25,14 +25,13 @@ export const opmsaSaveRequestTool = createTool({
     const client = await pool.connect();
     try {
       const res = await client.query(
-        `INSERT INTO demo_pedidos (nombre, dni, telefono, email, especialidad, motivo, obra_social, es_nuevo, estado)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pendiente')
+        `INSERT INTO demo_requests (full_name, dni, phone, specialty, reason, health_insurance, is_new_patient, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'RECIBIDO')
          RETURNING id`,
         [
           data.nombre,
           data.dni,
           data.telefono,
-          data.email || '',
           data.especialidad,
           data.motivo,
           data.obraSocial,
