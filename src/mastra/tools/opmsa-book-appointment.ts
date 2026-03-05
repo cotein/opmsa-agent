@@ -1,58 +1,43 @@
 import { createTool } from '@mastra/core/tools';
-import postgres from 'postgres';
+import pg from 'pg';
 import { z } from 'zod';
 import 'dotenv/config';
 
-const sql = postgres(process.env.SUPABASE_ACCESS_TOKEN as string);
+const { Pool } = pg;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
 
 export const opmsaBookAppointmentTool = createTool({
   id: 'opmsa-book-appointment',
-  description: 'Reserva un turno para un paciente en la agenda.',
+  description: 'Reserva un turno en la base de datos.',
   inputSchema: z.object({
-    especialistaId: z.string().uuid(),
-    pacienteNombre: z.string().describe('El nombre completo del paciente'),
-    pacienteTelefono: z.string().describe('El teléfono del paciente'),
-    pacienteId: z.string().uuid().optional().describe('El ID del prospecto/paciente actual, provisto por el sistema'),
-    fechaHora: z.string().describe('Formato ISO string del slot elegido'),
-    notas: z.string().optional(),
+    especialistaId: z.string().describe('ID del odontólogo'),
+    pacienteNombre: z.string().describe('Nombre del paciente'),
+    pacienteTelefono: z.string().describe('Teléfono del paciente'),
+    fechaHora: z.string().describe('Fecha y hora en formato ISO'),
+    notas: z.string().optional().describe('Notas adicionales'),
   }),
-  execute: async ({ especialistaId, pacienteNombre, pacienteTelefono, pacienteId, fechaHora, notas }) => {
+  execute: async ({ especialistaId, pacienteNombre, pacienteTelefono, fechaHora, notas }) => {
+    const client = await pool.connect();
     try {
-      console.log(`[BOOK_APPOINTMENT] Executing for paciente: ${pacienteNombre}, id: ${pacienteId}, tel: ${pacienteTelefono}`);
-      let finalPacienteId = pacienteId || '';
+      const res = await client.query(
+        `INSERT INTO demo_agenda (especialista_id, paciente_nombre, paciente_telefono, fecha_hora, notas, estado)
+         VALUES ($1, $2, $3, $4, $5, 'reservado')
+         RETURNING id`,
+        [especialistaId, pacienteNombre, pacienteTelefono, fechaHora, notas || '']
+      );
       
-      if (finalPacienteId) {
-        // Actualizamos el prospecto existente con su nombre y teléfono real
-        await sql`
-          UPDATE demo_pacientes 
-          SET nombre_completo = ${pacienteNombre}, telefono = ${pacienteTelefono}
-          WHERE id = ${finalPacienteId}
-        `;
-      } else {
-        // Buscar al paciente por teléfono o crearlo (fallback si no hay ID)
-        const pacienteRows = await sql`SELECT id FROM demo_pacientes WHERE telefono = ${pacienteTelefono}`;
-        
-        if (pacienteRows && pacienteRows.length > 0) {
-          finalPacienteId = pacienteRows[0].id as string;
-          await sql`UPDATE demo_pacientes SET nombre_completo = ${pacienteNombre} WHERE id = ${finalPacienteId}`;
-        } else {
-          const insertRows = await sql`INSERT INTO demo_pacientes (nombre_completo, telefono) VALUES (${pacienteNombre}, ${pacienteTelefono}) RETURNING id`;
-          finalPacienteId = insertRows[0].id as string;
-        }
-      }
-
-      await sql`
-         INSERT INTO demo_agenda (especialista_id, paciente_id, fecha_hora, estado, notas)
-         VALUES (${especialistaId}, ${finalPacienteId}, ${fechaHora}, 'reservado', ${notas ?? null})
-         ON CONFLICT (especialista_id, fecha_hora)
-         DO UPDATE SET 
-            paciente_id = EXCLUDED.paciente_id, 
-            estado = EXCLUDED.estado, 
-            notas = EXCLUDED.notas
-      `;
-      return { success: true, message: 'Turno reservado con éxito' };
+      return {
+        success: true,
+        appointmentId: res.rows[0].id,
+        message: 'Turno reservado exitosamente',
+      };
     } catch (error: any) {
-      return { success: false, error: error.message };
+      console.error('Error booking appointment:', error);
+      return { success: false, message: error.message };
+    } finally {
+      client.release();
     }
   },
 });

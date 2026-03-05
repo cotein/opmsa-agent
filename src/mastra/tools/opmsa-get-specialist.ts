@@ -1,9 +1,12 @@
 import { createTool } from '@mastra/core/tools';
-import postgres from 'postgres';
+import pg from 'pg';
 import { z } from 'zod';
 import 'dotenv/config';
 
-const sql = postgres(process.env.SUPABASE_ACCESS_TOKEN as string);
+const { Pool } = pg;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
 
 // 2. Tool: Obtener Especialistas (Para que el agente sepa quiénes trabajan hoy)
 export const opmsaGetSpecialistsTool = createTool({
@@ -11,7 +14,12 @@ export const opmsaGetSpecialistsTool = createTool({
   description: 'Lista los especialistas disponibles y sus especialidades.',
   inputSchema: z.object({}),
   execute: async () => {
-    const rows = await sql`SELECT id, nombre, especialidad FROM demo_especialistas WHERE activo = true`;
-    return { success: true, specialists: rows };
+    const client = await pool.connect();
+    try {
+      const res = await client.query('SELECT id, nombre, especialidad FROM demo_especialistas WHERE activo = true');
+      return { success: true, specialists: res.rows };
+    } finally {
+      client.release();
+    }
   }
 });

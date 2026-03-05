@@ -1,9 +1,12 @@
 import { createTool } from '@mastra/core/tools';
-import postgres from 'postgres';
+import pg from 'pg';
 import { z } from 'zod';
 import 'dotenv/config';
 
-const sql = postgres(process.env.SUPABASE_ACCESS_TOKEN as string);
+const { Pool } = pg;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
 
 export const opmsaGetAvailableSlotsTool = createTool({
   id: 'opmsa-get-available-slots',
@@ -23,53 +26,59 @@ export const opmsaGetAvailableSlotsTool = createTool({
     const fechaLimite = new Date(ahora.getTime());
     fechaLimite.setDate(ahora.getDate() + diasVista);
 
-    // Queries en Postgres
-    const result = await sql`SELECT fecha_hora
-       FROM demo_agenda 
-       WHERE especialista_id = ${especialistaId} 
-       AND fecha_hora >= ${ahora} 
-       AND fecha_hora <= ${fechaLimite}
-       AND estado IN ('reservado', 'confirmado')`;
-    
-    // Convertimos a TimeStamps. Postgres nos devuelve JS Date validos.
-    const ocupadosMap = new Set(result.map(r => new Date(r.fecha_hora).getTime()));
+    const client = await pool.connect();
+    try {
+      // Queries en Postgres usando pg
+      const result = await client.query(
+        `SELECT fecha_hora
+         FROM demo_agenda 
+         WHERE especialista_id = $1 
+         AND fecha_hora >= $2 
+         AND fecha_hora <= $3
+         AND estado IN ('reservado', 'confirmado')`,
+        [especialistaId, ahora, fechaLimite]
+      );
+      
+      const ocupadosMap = new Set(result.rows.map(r => new Date(r.fecha_hora).getTime()));
 
-    // Generar slots día por día
-    for (let i = 0; i <= diasVista; i++) {
-        const diaBusqueda = new Date(ahora.getTime());
-        diaBusqueda.setDate(ahora.getDate() + i);
-        
-        if (diaBusqueda.getDay() === 0) continue; // Saltea domingos estrictamente
+      // Generar slots día por día
+      for (let i = 0; i <= diasVista; i++) {
+          const diaBusqueda = new Date(ahora.getTime());
+          diaBusqueda.setDate(ahora.getDate() + i);
+          
+          if (diaBusqueda.getDay() === 0) continue; // Saltea domingos estrictamente
 
-        const pad = (n: number) => n.toString().padStart(2, '0');
-        const fechaKey = `${diaBusqueda.getFullYear()}-${pad(diaBusqueda.getMonth() + 1)}-${pad(diaBusqueda.getDate())}`;
-        
-        const horasLibresDelDia: string[] = [];
+          const pad = (n: number) => n.toString().padStart(2, '0');
+          const fechaKey = `${diaBusqueda.getFullYear()}-${pad(diaBusqueda.getMonth() + 1)}-${pad(diaBusqueda.getDate())}`;
+          
+          const horasLibresDelDia: string[] = [];
 
-        let cursor = new Date(diaBusqueda);
-        cursor.setHours(HORA_INICIO, 0, 0, 0); 
+          let cursor = new Date(diaBusqueda);
+          cursor.setHours(HORA_INICIO, 0, 0, 0); 
 
-        const finJornada = new Date(diaBusqueda);
-        finJornada.setHours(HORA_FIN, 0, 0, 0); 
+          const finJornada = new Date(diaBusqueda);
+          finJornada.setHours(HORA_FIN, 0, 0, 0); 
 
-        while (cursor < finJornada) {
-            // Evaluamos horas a futuro y si están en PostgreSQL
-            if (cursor > ahora && !ocupadosMap.has(cursor.getTime())) {
-                const horaLocal = `${pad(cursor.getHours())}:${pad(cursor.getMinutes())}`;
-                horasLibresDelDia.push(horaLocal);
-            }
-            cursor.setMinutes(cursor.getMinutes() + INTERVALO);
-        }
+          while (cursor < finJornada) {
+              if (cursor > ahora && !ocupadosMap.has(cursor.getTime())) {
+                  const horaLocal = `${pad(cursor.getHours())}:${pad(cursor.getMinutes())}`;
+                  horasLibresDelDia.push(horaLocal);
+              }
+              cursor.setMinutes(cursor.getMinutes() + INTERVALO);
+          }
 
-        if (horasLibresDelDia.length > 0) {
-            slotsFinales.push({ fecha: fechaKey, horas: horasLibresDelDia });
-        }
+          if (horasLibresDelDia.length > 0) {
+              slotsFinales.push({ fecha: fechaKey, horas: horasLibresDelDia });
+          }
+      }
+
+      return {
+        success: true,
+        disponibilidad: slotsFinales,
+        count: slotsFinales.reduce((acc, curr) => acc + curr.horas.length, 0)
+      };
+    } finally {
+      client.release();
     }
-
-    return {
-      success: true,
-      disponibilidad: slotsFinales,
-      count: slotsFinales.reduce((acc, curr) => acc + curr.horas.length, 0)
-    };
   },
 });

@@ -1,33 +1,33 @@
 import { createTool } from '@mastra/core/tools';
-import postgres from 'postgres';
+import pg from 'pg';
 import { z } from 'zod';
 import 'dotenv/config';
 
-const sql = postgres(process.env.SUPABASE_ACCESS_TOKEN as string);
+const { Pool } = pg;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
 
 export const opmsaUpdateRequestStatusTool = createTool({
   id: 'opmsa-update-request-status',
-  description: 'Actualiza el estado de una solicitud existente (ej. a "CANCELADO" o "REPROGRAMADO").',
+  description: 'Actualiza el estado de una solicitud de turno (ej. a "agendado").',
   inputSchema: z.object({
-    patientPhone: z.string().describe('El teléfono del paciente (u otro ID para ubicar su turno)'),
-    newStatus: z.enum(['CANCELADO', 'REPROGRAMADO']).describe('El nuevo estado de la solicitud'),
+    requestId: z.number().describe('ID de la solicitud en demo_pedidos'),
+    nuevoEstado: z.string().describe('Nuevo estado (agendado, cancelado, etc.)'),
   }),
-  execute: async ({ patientPhone, newStatus }) => {
+  execute: async ({ requestId, nuevoEstado }) => {
+    const client = await pool.connect();
     try {
-      // Find the most recent active request for this phone
-      const rows = await sql`SELECT id FROM demo_requests WHERE phone = ${patientPhone} ORDER BY created_at DESC LIMIT 1`;
-
-      if (!rows || rows.length === 0) {
-        return { success: false, message: 'No se encontró ninguna solicitud reciente para este número.' };
-      }
-
-      const requestId = rows[0].id as string;
-
-      await sql`UPDATE demo_requests SET status = ${newStatus}, updated_at = CURRENT_TIMESTAMP WHERE id = ${requestId}`;
-
-      return { success: true, requestId, newStatus, message: `Estado actualizado a ${newStatus} con éxito.` };
+      await client.query(
+        `UPDATE demo_pedidos SET estado = $1 WHERE id = $2`,
+        [nuevoEstado, requestId]
+      );
+      return { success: true, requestId, nuevoEstado, message: `Estado actualizado a ${nuevoEstado} con éxito.` };
     } catch (error: any) {
+      console.error('Error updating status:', error);
       return { success: false, error: error.message };
+    } finally {
+      client.release();
     }
   },
 });

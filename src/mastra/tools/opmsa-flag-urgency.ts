@@ -1,32 +1,34 @@
 import { createTool } from '@mastra/core/tools';
-import postgres from 'postgres';
+import pg from 'pg';
 import { z } from 'zod';
 import 'dotenv/config';
 
-const sql = postgres(process.env.SUPABASE_ACCESS_TOKEN as string);
+const { Pool } = pg;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
 
 export const opmsaFlagUrgencyTool = createTool({
   id: 'opmsa-flag-urgency',
-  description: 'Marca una interacción como URGENCIA para que sea atendida inmediatamente por un operador humano.',
+  description: 'Marca una conversación como urgencia dental y guarda el contacto.',
   inputSchema: z.object({
-    patientPhone: z.string().describe('El teléfono del paciente'),
-    urgencyDescription: z.string().describe('Descripción breve de la urgencia médica'),
+    phone: z.string().describe('Teléfono del paciente'),
+    reason: z.string().describe('Motivo de la urgencia'),
   }),
-  execute: async ({ patientPhone, urgencyDescription }) => {
+  execute: async ({ phone, reason }) => {
+    const client = await pool.connect();
     try {
-      await sql`INSERT INTO demo_requests 
-              (phone, full_name, reason, status)
-              VALUES (${patientPhone}, 'URGENCIA NO IDENTIFICADA', ${urgencyDescription}, 'URGENCIA')`;
-
-      // Here you would typically integrate with an SMS gateway, Slack hook, or Email API to alert the operator immediately.
-      console.log(`[URGENCIA DETECTADA] Paciente ${patientPhone} reporta: ${urgencyDescription}`);
-
-      return { 
-        success: true, 
-        message: 'Urgencia registrada y operador notificado. Dile al paciente que aguarde un momento en línea.' 
-      };
+      await client.query(
+        `INSERT INTO demo_pedidos (telefono, motivo, estado, especialidad, nombre, dni, obra_social, es_nuevo)
+         VALUES ($1, $2, 'urgencia', 'Urgencia', 'Paciente Urgencia', '0', 'N/A', false)`,
+        [phone, reason]
+      );
+      return { success: true, message: 'Urgencia marcada y guardada.' };
     } catch (error: any) {
+      console.error('Error flagging urgency:', error);
       return { success: false, error: error.message };
+    } finally {
+      client.release();
     }
   },
 });
