@@ -13,7 +13,7 @@ COPY src ./src
 COPY tsconfig.json ./
 
 # Copiar archivos de configuración si existen (opcional)
-COPY .env-example .env-example* ./
+COPY .env.example .env.example* ./
 
 RUN npm run build
 
